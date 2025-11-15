@@ -120,14 +120,14 @@ def find_car(query, df):
     return None
 
 # ==============================
-# Chatbot Logic
+# Chatbot Logic (CORRECTED)
 # ==============================
 def process_query(query, df):
     """
     Processes the user's query against the *provided* dataframe.
     """
     if df.empty or not st.session_state.get('data_valid', False):
-        return "Sorry, the loaded data is invalid or missing required columns. Please upload a valid EV data CSV."
+        return "Sorry, the loaded data is invalid or missing required columns. Please upload a valid EV data CSV or reset to default data."
 
     q = query.lower().strip()
     original_q = query.strip()
@@ -321,21 +321,22 @@ def process_query(query, df):
     ])
 
 # ==============================
-# MAIN APP & DATA MANAGEMENT
+# MAIN APP & DATA MANAGEMENT (CORRECTED)
 # ==============================
 
 # Initialize session state for data
 if 'active_df' not in st.session_state:
     default_df = load_default_data()
-    st.session_state.active_df = process_dataframe(default_df)
+    # Let process_dataframe set the data_valid flag
+    st.session_state.active_df = process_dataframe(default_df) 
     st.session_state.data_source = "Default Data"
-    st.session_state.data_valid = True # Assume default data is valid
+    # st.session_state.data_valid is set by process_dataframe()
 
 # --- Sidebar for Navigation and File Upload ---
 st.sidebar.title("⚡ EV Data Hub")
 st.sidebar.markdown("---")
 
-# --- NEW: Added "Home" page as the first (default) option
+# --- Navigation
 page = st.sidebar.selectbox("Choose a feature", [
     "🏠 Home",
     "🤖 EV Price Predictor",
@@ -374,7 +375,7 @@ if not st.session_state.get('data_valid', True):
     st.sidebar.error("Data is missing required columns. Chatbot and Viz are disabled.")
 
 # ==============================
-# NEW: 0. Home Page
+# 0. Home Page
 # ==============================
 if page == "🏠 Home":
     st.title("⚡ Welcome to the EV Data Hub")
@@ -452,7 +453,7 @@ elif page == "💬 EV Data Chatbot":
     
     # Guard Clause
     if not st.session_state.get('data_valid', False):
-        st.error("Chatbot disabled: The active data file is missing required columns.")
+        st.error("Chatbot disabled: The active data file is invalid or missing required columns.")
         st.markdown(f"Please upload a valid CSV with columns like: `{', '.join(REQUIRED_COLUMNS)}` or reset to default data.")
     else:
         # Initialize chat history
@@ -498,7 +499,7 @@ elif page == "📊 Data Visualization":
 
     # Guard Clause
     if not st.session_state.get('data_valid', False):
-        st.error("Visualizations disabled: The active data file is missing required columns.")
+        st.error("Visualizations disabled: The active data file is invalid or missing required columns.")
         st.markdown(f"Please upload a valid CSV with columns like: `{', '.join(REQUIRED_COLUMNS)}` or reset to default data.")
     elif df.empty:
         st.warning("No data loaded.")
