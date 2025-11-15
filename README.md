@@ -1,6 +1,6 @@
 # ⚡ EV Data Hub
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-render-app-url.onrender.com)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://edunet-week-3-internship.onrender.com/)
 
 An interactive, multi-page Streamlit application for analyzing, visualizing, and interacting with Electric Vehicle (EV) data.
 
