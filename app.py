@@ -72,7 +72,7 @@ def process_dataframe(df):
     st.session_state.data_valid = True
     try:
         processed_df = df.copy()
-        # --- THIS IS THE KEY: All brand data is UPPERCASE ---
+        # --- All brand data is UPPERCASE ---
         processed_df['Brand'] = processed_df['Brand'].str.upper() 
         processed_df['Model'] = processed_df['Model'].str.strip()
         
@@ -121,7 +121,7 @@ def find_car(query, df):
     return None
 
 # ==============================
-# Chatbot Logic (CORRECTED & IMPROVED)
+# Chatbot Logic (Corrected & Improved)
 # ==============================
 def process_query(query, df):
     """
@@ -141,7 +141,6 @@ def process_query(query, df):
             "Hello! What EV are you dreaming about today?"
         ])
     
-    # --- IMPROVED HELP: Replaced backticks with italics
     if any(h in q for h in ["help", "what can you", "who are you", "info", "what do you do"]):
         return (
             "I'm your **EV Assistant**! Here's what I can do:\n\n"
@@ -190,7 +189,7 @@ def process_query(query, df):
 
     # === BRAND DETECTION (FIXED) ===
     all_brands_lower = [b.lower() for b in df['Brand'].unique()]
-    # --- THIS IS THE FIX: changed .title() to .upper() to match the data
+    # --- FIX: changed .title() to .upper() to match the data
     found_brands_in_query = list(set([b.upper() for b in all_brands_lower if b in q]))
 
     # === BRAND-LEVEL COMPARISON ===
@@ -199,7 +198,7 @@ def process_query(query, df):
         df1 = df[df['Brand'] == b1]
         df2 = df[df['Brand'] == b2]
         
-        # Add a check for empty dataframes to avoid nan
+        # Check for empty dataframes to avoid nan
         if df1.empty or df2.empty:
             missing_brand = b1 if df1.empty else b2
             return f"Sorry, I don't have enough data for **{missing_brand}** to make a comparison."
@@ -307,7 +306,7 @@ def process_query(query, df):
         
     # === BRAND SUMMARY (FIXED) ===
     if found_brand and len(q.split()) <= 3:
-        # --- THIS IS THE FIX: Check if df_context is empty to prevent 'nan'
+        # --- FIX: Check if df_context is empty to prevent 'nan'
         if df_context.empty:
             return f"Sorry, I couldn't find any models for **{found_brand}** in the data."
             
@@ -321,7 +320,7 @@ def process_query(query, df):
             f"• Price Range: `${df_context['Estimated_US_Value'].min():,.0f}` – `${df_context['Estimated_US_Value'].max():,.0f}`"
         )
         
-    # === NEW: AMBIGUITY HANDLERS ===
+    # === AMBIGUITY HANDLERS ===
     if q == "price" or q == "cost":
         return "That's a bit vague! Could you be more specific? Try:\n" \
                "• *cheapest car*\n" \
@@ -350,13 +349,13 @@ def process_query(query, df):
     ])
 
 # ==============================
-# MAIN APP & DATA MANAGEMENT (CORRECTED)
+# MAIN APP & DATA MANAGEMENT (Corrected)
 # ==============================
 
 # Initialize session state for data
 if 'active_df' not in st.session_state:
     default_df = load_default_data()
-    # --- THIS IS THE FIX: Let process_dataframe set the data_valid flag ---
+    # --- FIX: Let process_dataframe set the data_valid flag ---
     st.session_state.active_df = process_dataframe(default_df) 
     st.session_state.data_source = "Default Data"
     # st.session_state.data_valid is now set by process_dataframe()
@@ -410,7 +409,8 @@ if page == "🏠 Home":
     st.title("⚡ Welcome to the EV Data Hub")
     st.markdown("This app is your all-in-one tool for exploring, analyzing, and predicting information about Electric Vehicles.")
     
-    st.image("https.cdn.pixabay.com/photo/2024/04/11/15/22/ev-8690460_1280.jpg", use_container_width=True)
+    # --- FIX: Use local image path ---
+    st.image("assets/home_image.jpg", use_container_width=True)
     
     st.subheader("What You Can Do:", divider="rainbow")
     
@@ -438,7 +438,8 @@ if page == "🏠 Home":
 # 1. EV Price Predictor
 # ==============================
 elif page == "🤖 EV Price Predictor":
-    st.image("https.cdn.pixabay.com/photo/2022/01/25/19/12/electric-car-6968348_1280.jpg", use_container_width=True)
+    # --- FIX: Use local image path ---
+    st.image("assets/predictor_image.jpg", use_container_width=True)
     st.title("🤖 EV Price Predictor")
     st.markdown("### Tune specs → Get instant price estimate")
     st.info("ℹ️ This predictor uses a pre-trained model and is independent of the data you upload.")
