@@ -1,3 +1,7 @@
+# app.py
+# -*- coding: utf-8 -*-
+# EditorConfig: indent_style = space; indent_size = 4
+
 import streamlit as st
 import pandas as pd
 import joblib
@@ -17,7 +21,7 @@ REQUIRED_COLUMNS = [
 # ==============================
 # Page Configuration
 # ==============================
-st.set_page_config(page_title="EV Data Hub", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="EV Data Hub", page_icon="EV", layout="wide")
 
 # ==============================
 # Load Model
@@ -81,8 +85,8 @@ def process_dataframe(df):
         )
         processed_df['Search_Key'] = (
             processed_df['Brand'].str.lower() + ' ' + processed_df['Model'].str.lower()
-        ).str.replace(r'[^a-z0-9\s]', '', regex=True)
-         .str.replace(r'\s+', ' ', regex=True)
+        ).str.replace(r'[^a-z0-9\s]', '', regex=True) \
+         .str.replace(r'\s+', ' ', regex=True) \
          .str.strip()
 
         return processed_df
@@ -167,16 +171,13 @@ def process_query(query, df):
         ])
 
     # --- Data-Dependent Queries ---
-    # === LIST ALL BRANDS ===
     if "brand" in q and any(x in q for x in ["list", "all", "available", "show"]):
         brands = sorted(df['Brand'].unique())
         return f"**Available Brands** ({len(brands)}): \n`{', '.join(brands)}`"
 
-    # === HOW MANY CARS? ===
     if "how many" in q and ("car" in q or "model" in q or "ev" in q):
         return f"There are **{len(df)} EV models** in the database from **{len(df['Brand'].unique())} brands**."
 
-    # === DATASET SUMMARY ===
     if any(s in q for s in ["summary", "stats", "overview", "dataset", "data info"]):
         total = len(df)
         brands = df['Brand'].nunique()
@@ -291,7 +292,7 @@ def process_query(query, df):
             f"• **Towing**: {int(car['Towing_capacity_in_kg'])} kg"
         )
 
-    # === EXTREME QUERIES (with brand context) ===
+    # === EXTREME QUERIES ===
     if ("longest" in q or "most" in q or "best" in q) and "range" in q:
         if df_context.empty:
             return f"No cars found {context.lower()}."
@@ -318,7 +319,7 @@ def process_query(query, df):
         return f"{context}, the **{car['Brand']} {car['Model']}** tows the most: **{int(car['Towing_capacity_in_kg'])} kg**."
 
     # === BRAND SUMMARY (SAFE) ===
-    if found_brand and len(q.split()) <= 4:  # Slightly more lenient
+    if found_brand and len(q.split()) <= 4:
         if df_context.empty:
             suggestions = [b for b in df['Brand'].unique() if found_brand.lower() in b.lower()][:3]
             if suggestions:
@@ -351,14 +352,14 @@ if 'active_df' not in st.session_state:
     st.session_state.data_valid = True
 
 # --- Sidebar ---
-st.sidebar.title("⚡ EV Data Hub")
+st.sidebar.title("EV Data Hub")
 st.sidebar.markdown("---")
 
 page = st.sidebar.selectbox("Choose a feature", [
-    "🏠 Home",
-    "🤖 EV Price Predictor",
-    "💬 EV Data Chatbot",
-    "📊 Data Visualization"
+    "Home",
+    "EV Price Predictor",
+    "EV Data Chatbot",
+    "Data Visualization"
 ])
 
 st.sidebar.markdown("---")
@@ -404,33 +405,31 @@ with st.sidebar.expander("Debug: Available Brands", expanded=False):
 # PAGES
 # ==============================
 
-# --- Home ---
-if page == "🏠 Home":
-    st.title("⚡ Welcome to the EV Data Hub")
+if page == "Home":
+    st.title("Welcome to the EV Data Hub")
     st.markdown("This app is your all-in-one tool for exploring, analyzing, and predicting information about Electric Vehicles.")
     st.image("https://cdn.pixabay.com/photo/2024/04/11/15/22/ev-8690460_1280.jpg", use_container_width=True)
     st.subheader("What You Can Do:", divider="rainbow")
     col1, col2, col3 = st.columns(3)
     with col1:
         with st.container(border=True):
-            st.markdown("#### 🤖 EV Price Predictor")
+            st.markdown("#### EV Price Predictor")
             st.markdown("Estimate the price of an EV based on its technical specs.")
     with col2:
         with st.container(border=True):
-            st.markdown("#### 💬 EV Data Chatbot")
+            st.markdown("#### EV Data Chatbot")
             st.markdown("Ask natural language questions about the active dataset.")
     with col3:
         with st.container(border=True):
-            st.markdown("#### 📊 Data Visualization")
+            st.markdown("#### Data Visualization")
             st.markdown("Use interactive charts and filters to explore the dataset.")
     st.info("**Get Started:** Select a feature from the sidebar. Upload your own CSV or use default data!")
 
-# --- Price Predictor ---
-elif page == "🤖 EV Price Predictor":
+elif page == "EV Price Predictor":
     st.image("https://cdn.pixabay.com/photo/2022/01/25/19/12/electric-car-6968348_1280.jpg", use_container_width=True)
-    st.title("🤖 EV Price Predictor")
+    st.title("EV Price Predictor")
     st.markdown("### Tune specs → Get instant price estimate")
-    st.info("ℹ️ This predictor uses a pre-trained model and is independent of the data you upload.")
+    st.info("This predictor uses a pre-trained model and is independent of the data you upload.")
     with st.container(border=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -453,9 +452,8 @@ elif page == "🤖 EV Price Predictor":
             else:
                 st.error("Model not loaded.")
 
-# --- Chatbot ---
-elif page == "💬 EV Data Chatbot":
-    st.title("💬 EV Data Chatbot")
+elif page == "EV Data Chatbot":
+    st.title("EV Data Chatbot")
     st.markdown(f"Ask anything about the **{st.session_state.data_source}** dataset!")
     df = st.session_state.active_df
 
@@ -489,9 +487,8 @@ elif page == "💬 EV Data Chatbot":
             with st.chat_message("assistant"):
                 st.markdown(response)
 
-# --- Visualization ---
-elif page == "📊 Data Visualization":
-    st.title("📊 Data Visualization")
+elif page == "Data Visualization":
+    st.title("Data Visualization")
     st.markdown(f"Interactive charts for the **{st.session_state.data_source}** dataset")
     df = st.session_state.active_df
 
@@ -523,7 +520,7 @@ elif page == "📊 Data Visualization":
         ]
 
         if filtered.empty:
-            st.info("ℹ️ No cars match the current filters. Try expanding your selection.")
+            st.info("No cars match the current filters. Try expanding your selection.")
         else:
             t1, t2, t3, t4, t5 = st.tabs(["Price vs Range", "Brands", "Performance", "Efficiency", "Top 10"])
             with t1:
