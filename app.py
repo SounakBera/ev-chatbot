@@ -1,31 +1,45 @@
+import streamlit as st
 import pandas as pd
-from flask import Flask, request, jsonify, render_template_string
-import random # <-- ADDED THIS IMPORT
+import joblib
+import numpy as np
+import random
+import plotly.express as px
+import plotly.graph_objects as go
 
-# Initialize the Flask app
-app = Flask(__name__)
+# Page Configuration
+st.set_page_config(page_title="EV App", page_icon="EV", layout="wide")
 
-# --- Load Data ---
-# Load your EV data
-try:
-    df = pd.read_csv('cars_data_cleaned.csv')
-    # Convert brand names to uppercase for easier matching
-    df['Brand'] = df['Brand'].str.upper()
-except FileNotFoundError:
-    print("ERROR: cars_data_cleaned.csv not found.")
-    df = pd.DataFrame() # Create empty dataframe to avoid errors
+# Load the trained model
+@st.cache_resource
+def load_model():
+    try:
+        return joblib.load("model.pkl")
+    except FileNotFoundError:
+        st.error("Model file 'model.pkl' not found. Please ensure it's available.")
+        return None
 
-# --- Chatbot Logic (NOW MORE HUMAN-LIKE) ---
+model = load_model()
+
+# Load EV data
+@st.cache_data
+def load_data():
+    try:
+        df = pd.read_csv('cars_data_cleaned.csv')
+        df['Brand'] = df['Brand'].str.upper()
+        return df
+    except FileNotFoundError:
+        st.error("Data file 'cars_data_cleaned.csv' not found.")
+        return pd.DataFrame()
+
+df = load_data()
+
+# Chatbot Logic
 def process_query(query):
-    """
-    Processes a user's text query and returns a string response.
-    """
     query = query.lower().strip()
 
     if df.empty:
         return "Sorry, I can't access the car data at the moment."
 
-    # --- NEW: Conversational Intents ---
     greetings = ["hi", "hello", "hey", "yo", "howdy"]
     if query in greetings:
         responses = [
@@ -47,28 +61,22 @@ def process_query(query):
 
     help_identity = ["help", "what can you do", "who are you", "info"]
     if query in help_identity:
-        return "I'm an EV chatbot! You can ask me questions like 'what's the fastest car?', 'cheapest car for TESLA', or 'tell me about PORSCHE'."
+        return "I'm an EV chatbot! You can ask me questions like 'what's the fastest car?', 'cheapest car for TESLA', 'tell me about PORSCHE', 'highest towing capacity for FORD', 'quickest 0-100 for BMW', or 'longest range overall'."
 
-    # --- Standard Data Questions ---
     if query == "how many cars are there?":
         return f"There are {len(df)} car models in the dataset."
 
     elif query == "what brands are available?":
         brands = df['Brand'].unique()
-        # Sort brands alphabetically for easier reading
         brands.sort()
         return f"Available brands: {', '.join(brands)}"
 
-    # --- More flexible logic (from before) ---
-
-    # Helper to find brand in query
     all_brands = list(df['Brand'].unique())
     
     def find_brand_in_query(q):
         for brand in all_brands:
             if brand.lower() in q:
                 return brand
-        # Check for the old "info on [Brand]" style as a fallback
         if q.startswith("info on "):
             brand_name_from_query = q[len("info on "):].upper()
             if brand_name_from_query in all_brands:
@@ -77,7 +85,6 @@ def process_query(query):
 
     found_brand = find_brand_in_query(query)
     
-    # Create a working DataFrame (df_context) that is filtered if a brand is found
     df_context = df
     context_text = "Overall"
     context_text_lower = "overall"
@@ -89,8 +96,6 @@ def process_query(query):
         if df_context.empty:
             return f"I found {found_brand} in your query, but I have no data for that brand."
 
-    # --- Intent 1: Extremums (Max/Min) ---
-    
     if ("longest" in query or "most" in query or "highest" in query) and "range" in query:
         car = df_context.loc[df_context['km_of_range'].idxmax()]
         responses = [
@@ -101,7 +106,6 @@ def process_query(query):
         return random.choice(responses)
 
     if "cheapest" in query or "lowest price" in query:
-        # Filter out cars with 0 value, as that's likely missing data
         non_zero_df = df_context[df_context['Estimated_US_Value'] > 0]
         if non_zero_df.empty:
             return f"Sorry, I couldn't find any cars with a valid price {context_text_lower}."
@@ -130,15 +134,11 @@ def process_query(query):
         ]
         return random.choice(responses)
 
-    # --- Intent 2: Brand Info (as a fallback if no extremum was asked) ---
-    # This intent is *only* triggered if a brand was found but no extremum
     if found_brand:
-        # 'found_brand' is already set, 'df_context' is already filtered
         avg_val = df_context['Estimated_US_Value'].mean()
         avg_range = df_context['km_of_range'].mean()
         return f"I found {len(df_context)} models for {found_brand}. On average, they cost ${avg_val:,.2f} and have a range of {avg_range:,.1f} km."
 
-    # --- Fallback ---
     else:
         responses = [
             "Sorry, I'm not sure how to answer that. Try asking about 'fastest', 'cheapest', or 'range'.",
@@ -147,212 +147,211 @@ def process_query(query):
         ]
         return random.choice(responses)
 
-# --- API Endpoint (Same as before) ---
-# This route is for the chatbot API
-@app.route('/chat', methods=['POST'])
-def chat():
-    user_query = request.json.get('query')
-    if not user_query:
-        return jsonify({'error': 'No query provided'}), 400
-    
-    bot_response = process_query(user_query)
-    
-    return jsonify({'response': bot_response})
+# Main App
+st.sidebar.title("EV App Navigation")
+page = st.sidebar.selectbox("Choose a feature", ["EV Price Predictor", "EV Data Chatbot", "Data Visualization"])
 
-# --- Web Page Route (NEW) ---
-# This route serves the HTML page for the chat interface
-@app.route('/')
-def home():
-    # We define the HTML, CSS, and JavaScript as one long string
-    # This keeps everything in a single file
-    html_template = """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-R-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>EV Chatbot</title>
-        <style>
-            /* Basic styling for the chat interface */
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                background-color: #f4f7f6;
-                margin: 0;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-            }
-            #chat-container {
-                width: 90%;
-                max-width: 600px;
-                height: 80vh;
-                background-color: #ffffff;
-                border-radius: 12px;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-            header {
-                background-color: #007aff;
-                color: white;
-                padding: 20px;
-                text-align: center;
-                border-radius: 12px 12px 0 0;
-            }
-            h1 {
-                margin: 0;
-                font-size: 1.5em;
-            }
-            #chat-window {
-                flex-grow: 1;
-                padding: 20px;
-                overflow-y: auto; /* Allows scrolling */
-                display: flex;
-                flex-direction: column;
-                gap: 15px;
-            }
-            /* Message bubbles */
-            .message {
-                padding: 12px 18px;
-                border-radius: 20px;
-                line-height: 1.5;
-                max-width: 80%;
-            }
-            .user-message {
-                background-color: #007aff;
-                color: white;
-                align-self: flex-end;
-                border-bottom-right-radius: 5px;
-            }
-            .bot-message {
-                background-color: #e5e5ea;
-                color: black;
-                align-self: flex-start;
-                border-bottom-left-radius: 5px;
-            }
-            #chat-form {
-                display: flex;
-                border-top: 1px solid #ddd;
-                padding: 15px;
-            }
-            #chat-input {
-                flex-grow: 1;
-                border: 1px solid #ccc;
-                border-radius: 20px;
-                padding: 12px 15px;
-                font-size: 1em;
-                margin-right: 10px;
-            }
-            #chat-input:focus {
-                outline: none;
-                border-color: #007aff;
-            }
-            #send-button {
-                background-color: #007aff;
-                color: white;
-                border: none;
-                border-radius: 20px;
-                padding: 12px 20px;
-                font-size: 1em;
-                cursor: pointer;
-                transition: background-color 0.2s;
-            }
-            #send-button:hover {
-                background-color: #005bb5;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="chat-container">
-            <header>
-                <h1>EV Data Chatbot</h1>
-            </header>
-            <div id="chat-window">
-                <!-- Chat messages will be added here by JavaScript -->
-                <div class="message bot-message">
-                    Hi! I'm an EV chatbot. Ask me about the data. You can ask 'longest range', 'cheapest car', or 'info on [Brand]'.
-                </div>
-            </div>
-            <form id="chat-form">
-                <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off">
-                <button type="submit" id="send-button">Send</button>
-            </form>
-        </div>
+if page == "EV Price Predictor":
+    st.image("https://cdn.pixabay.com/photo/2022/01/25/19/12/electric-car-6968348_1280.jpg", use_column_width=True)
+    st.title("EV Price Predictor")
+    st.markdown("### Adjust the specifications to estimate the car's value.")
 
-        <script>
-            // JavaScript to handle the chat interaction
-            const chatForm = document.getElementById('chat-form');
-            const chatInput = document.getElementById('chat-input');
-            const chatWindow = document.getElementById('chat-window');
+    col1, col2 = st.columns(2)
+    with col1:
+        battery = st.number_input("Battery Capacity (kWh)", min_value=20.0, max_value=150.0, value=75.0)
+        accel = st.number_input("0-100 km/h (sec)", min_value=2.0, max_value=20.0, value=6.0)
+        seats = st.slider("Number of Seats", 2, 8, 5)
+    with col2:
+        top_speed = st.number_input("Top Speed (km/h)", min_value=100, max_value=400, value=200)
+        range_km = st.number_input("Range (km)", min_value=100, max_value=800, value=400)
+        efficiency = st.number_input("Efficiency (Wh/km)", min_value=100, max_value=300, value=180)
 
-            chatForm.addEventListener('submit', async (event) => {
-                event.preventDefault(); // Stop the form from reloading the page
+    if st.button("Predict Price"):
+        if model:
+            input_data = pd.DataFrame({
+                'Battery': [battery],
+                '0-100': [accel],
+                'Top_Speed': [top_speed],
+                'Range': [range_km],
+                'Efficiency': [efficiency],
+                'Number_of_seats': [seats]
+            })
+            prediction = model.predict(input_data)[0]
+            st.success(f"Estimated Price: **${prediction:,.2f}**")
+        else:
+            st.error("Model could not be loaded.")
 
-                const userQuery = chatInput.value.trim();
-                if (userQuery === "") {
-                    return; // Don't send empty messages
-                }
+elif page == "EV Data Chatbot":
+    st.title("EV Data Chatbot")
+    st.markdown("Ask me about the EV data! Examples: 'longest range', 'cheapest car for TESLA', 'tell me about PORSCHE', 'highest towing capacity for FORD', 'quickest 0-100 for BMW', or 'longest range overall'.")
 
-                // 1. Display the user's message
-                addMessageToWindow(userQuery, 'user');
-                
-                // Clear the input box
-                chatInput.value = "";
-                
-                // 2. Send the message to the backend API
-                try {
-                    const response = await fetch('/chat', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ query: userQuery })
-                    });
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hi! I'm an EV chatbot. Ask me about the data. You can ask 'longest range', 'cheapest car', 'info on [Brand]', 'highest towing capacity for FORD', 'quickest 0-100 for BMW', or 'longest range overall'."}
+        ]
 
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-                    const data = await response.json();
-                    
-                    // 3. Display the bot's response
-                    addMessageToWindow(data.response, 'bot');
+    if prompt := st.chat_input("Type your message..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-                } catch (error) {
-                    console.error('Error:', error);
-                    addMessageToWindow('Sorry, something went wrong. Please try again.', 'bot');
-                }
-            });
+        response = process_query(prompt)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        with st.chat_message("assistant"):
+            st.markdown(response)
 
-            function addMessageToWindow(message, sender) {
-                // Create a new message div
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('message');
-                
-                if (sender === 'user') {
-                    messageDiv.classList.add('user-message');
-                } else {
-                    messageDiv.classList.add('bot-message');
-                }
+elif page == "Data Visualization":
+    st.title("EV Data Visualization")
+    st.markdown("Explore interactive charts with **real-time filters**.")
 
-                messageDiv.textContent = message; // Set the text content
-                
-                // Add the message to the chat window
-                chatWindow.appendChild(messageDiv);
-                
-                // Scroll to the bottom
-                chatWindow.scrollTop = chatWindow.scrollHeight;
-            }
-        </script>
-    </body>
-    </html>
-    """
-    # This sends the HTML string to the browser
-    return render_template_string(html_template)
+    if df.empty:
+        st.warning("No data available for visualization.")
+    else:
+        # Prepare data
+        viz_df = df.copy()
+        viz_df = viz_df[viz_df['Estimated_US_Value'] > 0]
 
-# --- Run the App (for Render) ---
-if __name__ == '__main__':
-    # This host and port are for local testing. Render will use Gunicorn.
-    app.run(debug=False, host='0.0.0.0', port=5000)
+        # Sidebar Filters
+        st.sidebar.header("Interactive Filters")
+
+        # Brand filter
+        all_brands = sorted(viz_df['Brand'].unique())
+        selected_brands = st.sidebar.multiselect(
+            "Select Brands", 
+            options=all_brands,
+            default=all_brands[:5]  # Default: first 5
+        )
+
+        # Price range
+        price_min, price_max = int(viz_df['Estimated_US_Value'].min()), int(viz_df['Estimated_US_Value'].max())
+        selected_price = st.sidebar.slider(
+            "Price Range (USD)", 
+            min_value=price_min, 
+            max_value=price_max, 
+            value=(price_min, price_max),
+            step=1000,
+            format="$%d"
+        )
+
+        # Range filter
+        range_min, range_max = int(viz_df['km_of_range'].min()), int(viz_df['km_of_range'].max())
+        selected_range = st.sidebar.slider(
+            "Range (km)", 
+            min_value=range_min, 
+            max_value=range_max, 
+            value=(range_min, range_max),
+            step=10
+        )
+
+        # Battery filter
+        battery_min, battery_max = float(viz_df['Battery'].min()), float(viz_df['Battery'].max())
+        selected_battery = st.sidebar.slider(
+            "Battery Capacity (kWh)", 
+            min_value=battery_min, 
+            max_value=battery_max, 
+            value=(battery_min, battery_max),
+            step=0.1
+        )
+
+        # Seats filter
+        selected_seats = st.sidebar.multiselect(
+            "Number of Seats", 
+            options=sorted(viz_df['Number_of_seats'].unique()),
+            default=sorted(viz_df['Number_of_seats'].unique())
+        )
+
+        # Apply filters
+        filtered_df = viz_df[
+            (viz_df['Brand'].isin(selected_brands)) &
+            (viz_df['Estimated_US_Value'].between(selected_price[0], selected_price[1])) &
+            (viz_df['km_of_range'].between(selected_range[0], selected_range[1])) &
+            (viz_df['Battery'].between(selected_battery[0], selected_battery[1])) &
+            (viz_df['Number_of_seats'].isin(selected_seats))
+        ]
+
+        if filtered_df.empty:
+            st.warning("No cars match the selected filters. Try adjusting them.")
+        else:
+            # Tabs
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "Price vs Range", "Brand Distribution", "Performance", "Efficiency", "Top Models"
+            ])
+
+            with tab1:
+                st.subheader("Price vs Range (Filtered)")
+                fig = px.scatter(
+                    filtered_df, x='km_of_range', y='Estimated_US_Value',
+                    color='Brand', size='Battery',
+                    hover_data=['Model', 'Top_Speed', '0-100', 'Efficiency'],
+                    labels={'km_of_range': 'Range (km)', 'Estimated_US_Value': 'Price (USD)'},
+                    title="Price vs Range"
+                )
+                fig.update_layout(height=600)
+                st.plotly_chart(fig, use_container_width=True)
+
+            with tab2:
+                st.subheader("Models per Brand (Filtered)")
+                brand_counts = filtered_df['Brand'].value_counts().reset_index()
+                brand_counts.columns = ['Brand', 'Count']
+                fig = px.bar(
+                    brand_counts, x='Brand', y='Count',
+                    color='Count', color_continuous_scale='Viridis',
+                    title="EV Models per Brand"
+                )
+                fig.update_layout(xaxis={'categoryorder': 'total descending'})
+                st.plotly_chart(fig, use_container_width=True)
+
+            with tab3:
+                st.subheader("Acceleration vs Top Speed")
+                fig = px.scatter(
+                    filtered_df, x='0-100', y='Top_Speed',
+                    color='Brand', size='Estimated_US_Value',
+                    hover_data=['Model', 'km_of_range'],
+                    labels={'0-100': '0-100 km/h (sec)', 'Top_Speed': 'Top Speed (km/h)'},
+                    title="Performance Comparison"
+                )
+                fig.update_xaxes(autorange="reversed")
+                fig.update_layout(height=600)
+                st.plotly_chart(fig, use_container_width=True)
+
+            with tab4:
+                st.subheader("Average Efficiency by Brand")
+                eff_df = filtered_df.groupby('Brand')['Efficiency'].mean().reset_index().sort_values('Efficiency')
+                fig = px.bar(
+                    eff_df, x='Brand', y='Efficiency',
+                    color='Efficiency', color_continuous_scale='RdYlGn_r',
+                    title="Efficiency (Wh/km) – Lower is Better"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            with tab5:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("Top 10 Most Expensive")
+                    top10 = filtered_df.nlargest(10, 'Estimated_US_Value')[['Brand', 'Model', 'Estimated_US_Value', 'km_of_range']]
+                    top10['Estimated_US_Value'] = top10['Estimated_US_Value'].map('${:,.0f}'.format)
+                    st.dataframe(top10.reset_index(drop=True), use_container_width=True)
+
+                with col2:
+                    st.subheader("Top 10 Longest Range")
+                    range10 = filtered_df.nlargest(10, 'km_of_range')[['Brand', 'Model', 'km_of_range', 'Estimated_US_Value']]
+                    range10['Estimated_US_Value'] = range10['Estimated_US_Value'].map('${:,.0f}'.format)
+                    st.dataframe(range10.reset_index(drop=True), use_container_width=True)
+
+            # Summary
+            st.markdown("---")
+            col1, col2, col3, col4, col5 = st.columns(5)
+            with col1:
+                st.metric("Filtered Models", len(filtered_df))
+            with col2:
+                st.metric("Avg Price", f"${filtered_df['Estimated_US_Value'].mean():,.0f}")
+            with col3:
+                st.metric("Avg Range", f"{filtered_df['km_of_range'].mean():.0f} km")
+            with col4:
+                st.metric("Avg Efficiency", f"{filtered_df['Efficiency'].mean():.0f} Wh/km")
+            with col5:
+                st.metric("Avg Battery", f"{filtered_df['Battery'].mean():.1f} kWh")
